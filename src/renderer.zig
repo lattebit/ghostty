@@ -38,6 +38,9 @@ pub const lib = @import("lib/main.zig");
 pub const Renderer = switch (build_config.renderer) {
     .metal => GenericRenderer(Metal),
     .opengl => GenericRenderer(OpenGL),
+    // OpenGL ES reuses the OpenGL backend with ES-specific configuration.
+    // The actual ES adaptation is handled at runtime and in shader selection.
+    .opengl_es => GenericRenderer(OpenGL),
     .webgl => WebGL,
 };
 
