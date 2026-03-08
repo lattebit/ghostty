@@ -1149,6 +1149,20 @@ pub fn handleMessage(self: *Surface, msg: Message) !void {
                 .{ .selected = v },
             );
         },
+
+        .forward_write => |req| {
+            const data: []const u8 = switch (req) {
+                .small => |v| v.data[0..v.len],
+                .stable => |v| v,
+                .alloc => |v| v.data,
+            };
+            defer if (req == .alloc) req.alloc.alloc.free(req.alloc.data);
+            _ = try self.rt_app.performAction(
+                .{ .surface = self },
+                .forward_write,
+                .{ .data = data },
+            );
+        },
     }
 }
 

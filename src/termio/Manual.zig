@@ -1,12 +1,13 @@
 //! Manual implements a termio backend that does not spawn a subprocess or
 //! allocate a PTY. Instead, it allows external code to feed VT byte streams
 //! directly into the terminal via Termio.processOutput(). Write requests
-//! (keyboard input) are currently discarded; a write callback mechanism
-//! will be added in a subsequent phase.
+//! (keyboard input) are forwarded to the host application via the
+//! forward_write action so it can send them to the remote endpoint.
 const Manual = @This();
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const apprt = @import("../apprt.zig");
 const renderer = @import("../renderer.zig");
 const terminal = @import("../terminal/main.zig");
 const termio = @import("../termio.zig");
@@ -71,13 +72,13 @@ pub fn queueWrite(
     linefeed: bool,
 ) !void {
     _ = self;
-    _ = alloc;
-    _ = td;
-    _ = data;
     _ = linefeed;
-    // In manual mode, write requests (keyboard input) are discarded.
-    // The host application is responsible for forwarding input to the
-    // remote endpoint via its own mechanism (e.g., SSH channel).
+
+    // Forward keyboard input to the host application so it can relay
+    // the data to the remote endpoint (e.g., SSH channel, serial port).
+    _ = td.surface_mailbox.push(.{
+        .forward_write = try apprt.surface.Message.WriteReq.init(alloc, data),
+    }, .{ .instant = {} });
 }
 
 pub fn childExitedAbnormally(

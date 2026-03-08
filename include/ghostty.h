@@ -860,6 +860,12 @@ typedef struct {
   uint64_t len;
 } ghostty_action_scrollbar_s;
 
+// apprt.action.ForwardWrite.C
+typedef struct {
+  const uint8_t* data;
+  size_t len;
+} ghostty_action_forward_write_s;
+
 // apprt.Action.Key
 typedef enum {
   GHOSTTY_ACTION_QUIT,
@@ -926,6 +932,7 @@ typedef enum {
   GHOSTTY_ACTION_SEARCH_SELECTED,
   GHOSTTY_ACTION_READONLY,
   GHOSTTY_ACTION_COPY_TITLE_TO_CLIPBOARD,
+  GHOSTTY_ACTION_FORWARD_WRITE,
 } ghostty_action_tag_e;
 
 typedef union {
@@ -966,6 +973,7 @@ typedef union {
   ghostty_action_search_total_s search_total;
   ghostty_action_search_selected_s search_selected;
   ghostty_action_readonly_e readonly;
+  ghostty_action_forward_write_s forward_write;
 } ghostty_action_u;
 
 typedef struct {

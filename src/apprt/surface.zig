@@ -108,6 +108,9 @@ pub const Message = union(enum) {
     /// Selected search index change
     search_selected: ?usize,
 
+    /// Forward keyboard input from a manual termio backend to the host.
+    forward_write: WriteReq,
+
     pub const ReportTitleStyle = enum {
         csi_21_t,
 
