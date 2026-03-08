@@ -72,13 +72,31 @@ pub fn queueWrite(
     linefeed: bool,
 ) !void {
     _ = self;
-    _ = linefeed;
 
     // Forward keyboard input to the host application so it can relay
     // the data to the remote endpoint (e.g., SSH channel, serial port).
+    const payload = if (linefeed) try expandCrLf(alloc, data) else data;
+    defer if (linefeed) alloc.free(payload);
     _ = td.surface_mailbox.push(.{
-        .forward_write = try apprt.surface.Message.WriteReq.init(alloc, data),
+        .forward_write = try apprt.surface.Message.WriteReq.init(alloc, payload),
     }, .{ .instant = {} });
+}
+
+/// Expand bare CR to CR+LF for linefeed mode (DEC mode 20).
+fn expandCrLf(alloc: Allocator, data: []const u8) ![]const u8 {
+    const cr_count = std.mem.count(u8, data, "\r");
+    if (cr_count == 0) return alloc.dupe(u8, data);
+    const buf = try alloc.alloc(u8, data.len + cr_count);
+    var j: usize = 0;
+    for (data) |ch| {
+        buf[j] = ch;
+        j += 1;
+        if (ch == '\r') {
+            buf[j] = '\n';
+            j += 1;
+        }
+    }
+    return buf[0..j];
 }
 
 pub fn childExitedAbnormally(
