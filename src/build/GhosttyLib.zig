@@ -88,6 +88,12 @@ pub fn initShared(
     });
     _ = try deps.add(lib);
 
+    // Android NDK support
+    if (lib.rootModuleTarget().abi.isAndroid()) {
+        lib.link_z_max_page_size = 16384; // 16kb for Android 15+
+        try @import("android_ndk").addPaths(b, lib);
+    }
+
     // Get our debug symbols
     const dsymutil: ?std.Build.LazyPath = dsymutil: {
         if (!deps.config.target.result.os.tag.isDarwin()) {
