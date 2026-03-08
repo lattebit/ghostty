@@ -92,6 +92,8 @@ pub fn initShared(
     if (lib.rootModuleTarget().abi.isAndroid()) {
         lib.link_z_max_page_size = 16384; // 16kb for Android 15+
         try @import("android_ndk").addPaths(b, lib);
+        lib.linkSystemLibrary("GLESv3");
+        lib.linkSystemLibrary("EGL");
     }
 
     // Get our debug symbols
