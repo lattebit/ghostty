@@ -628,7 +628,7 @@ pub fn init(
 
         // Select the backend based on the target platform. Android uses
         // the manual backend (no local PTY); all other platforms use exec.
-        const backend: termio.backend.Config = if (is_android) .{ .manual = .{} } else backend: {
+        const backend: termio.Backend = if (is_android) .{ .manual = .{} } else backend: {
             var env = rt_surface.defaultTermioEnv() catch |err| env: {
                 log.warn("error getting env map for surface err={}", .{err});
                 break :env internal_os.getEnvMap(alloc) catch
@@ -1308,6 +1308,7 @@ fn childExitedAbnormally(
     // Build up our command for the error message
     const command = try std.mem.join(alloc, " ", switch (self.io.backend) {
         .exec => |*exec| exec.subprocess.args,
+        .manual => &.{"<external>"},
     });
     const runtime_str = try std.fmt.allocPrint(alloc, "{d} ms", .{info.runtime_ms});
 
