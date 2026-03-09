@@ -102,7 +102,10 @@ pub fn threadEnter(
     errdefer self.subprocess.stop();
 
     // Watcher to detect subprocess exit
-    var process: ?xev.Process = if (self.subprocess.process) |v| switch (v) {
+    var process: ?xev.Process = if (comptime builtin.os.tag == .ios)
+        // On iOS, no process is spawned. Data is fed from external sources.
+        null
+    else if (self.subprocess.process) |v| switch (v) {
         .fork_exec => |cmd| try xev.Process.init(
             cmd.pid orelse return error.ProcessNoPid,
         ),
@@ -118,12 +121,6 @@ pub fn threadEnter(
     // Track our process start time for abnormal exits
     const process_start = try std.time.Instant.now();
 
-    // Create our pipe that we'll use to kill our read thread.
-    // pipe[0] is the read end, pipe[1] is the write end.
-    const pipe = try internal_os.pipe();
-    errdefer posix.close(pipe[0]);
-    errdefer posix.close(pipe[1]);
-
     // Setup our stream so that we can write.
     var stream = xev.Stream.initFd(pty_fds.write);
     errdefer stream.deinit();
@@ -134,24 +131,43 @@ pub fn threadEnter(
     var termios_timer = try xev.Timer.init();
     errdefer termios_timer.deinit();
 
-    // Start our read thread
-    const read_thread = try std.Thread.spawn(
-        .{},
-        if (builtin.os.tag == .windows) ReadThread.threadMainWindows else ReadThread.threadMainPosix,
-        .{ pty_fds.read, io, pipe[0] },
-    );
-    read_thread.setName("io-reader") catch {};
+    if (comptime builtin.os.tag == .ios) {
+        // On iOS, no read thread — data is fed via ghostty_surface_write_pty_output
+        td.backend = .{ .exec = .{
+            .start = process_start,
+            .write_stream = stream,
+            .process = process,
+            .read_thread = null,
+            .read_thread_pipe = null,
+            .read_thread_fd = null,
+            .termios_timer = termios_timer,
+        } };
+    } else {
+        // Create our pipe that we'll use to kill our read thread.
+        // pipe[0] is the read end, pipe[1] is the write end.
+        const pipe = try internal_os.pipe();
+        errdefer posix.close(pipe[0]);
+        errdefer posix.close(pipe[1]);
 
-    // Setup our threadata backend state to be our own
-    td.backend = .{ .exec = .{
-        .start = process_start,
-        .write_stream = stream,
-        .process = process,
-        .read_thread = read_thread,
-        .read_thread_pipe = pipe[1],
-        .read_thread_fd = pty_fds.read,
-        .termios_timer = termios_timer,
-    } };
+        // Start our read thread
+        const read_thread = try std.Thread.spawn(
+            .{},
+            if (builtin.os.tag == .windows) ReadThread.threadMainWindows else ReadThread.threadMainPosix,
+            .{ pty_fds.read, io, pipe[0] },
+        );
+        read_thread.setName("io-reader") catch {};
+
+        // Setup our threadata backend state to be our own
+        td.backend = .{ .exec = .{
+            .start = process_start,
+            .write_stream = stream,
+            .process = process,
+            .read_thread = read_thread,
+            .read_thread_pipe = pipe[1],
+            .read_thread_fd = pty_fds.read,
+            .termios_timer = termios_timer,
+        } };
+    }
 
     // Start our process watcher. If we have an xev.Process use it.
     if (process) |*p| p.wait(
@@ -176,10 +192,8 @@ pub fn threadEnter(
         }
     }
 
-    // Start our termios timer. We don't support this on Windows.
-    // Fundamentally, we could support this on Windows so we're just
-    // waiting for someone to implement it.
-    if (comptime builtin.os.tag != .windows) {
+    // Start our termios timer. We don't support this on Windows or iOS.
+    if (comptime builtin.os.tag != .windows and builtin.os.tag != .ios) {
         termios_timer.run(
             td.loop,
             &td.backend.exec.termios_timer_c,
@@ -198,32 +212,36 @@ pub fn threadExit(self: *Exec, td: *termio.Termio.ThreadData) void {
     if (exec.exited) self.subprocess.externalExit();
     self.subprocess.stop();
 
-    // Quit our read thread after exiting the subprocess so that
-    // we don't get stuck waiting for data to stop flowing if it is
-    // a particularly noisy process.
-    _ = posix.write(exec.read_thread_pipe, "x") catch |err| switch (err) {
-        // BrokenPipe means that our read thread is closed already,
-        // which is completely fine since that is what we were trying
-        // to achieve.
-        error.BrokenPipe => {},
+    if (comptime builtin.os.tag == .ios) {
+        // On iOS, no read thread to stop
+    } else {
+        // Quit our read thread after exiting the subprocess so that
+        // we don't get stuck waiting for data to stop flowing if it is
+        // a particularly noisy process.
+        _ = posix.write(exec.read_thread_pipe, "x") catch |err| switch (err) {
+            // BrokenPipe means that our read thread is closed already,
+            // which is completely fine since that is what we were trying
+            // to achieve.
+            error.BrokenPipe => {},
 
-        else => log.warn(
-            "error writing to read thread quit pipe err={}",
-            .{err},
-        ),
-    };
+            else => log.warn(
+                "error writing to read thread quit pipe err={}",
+                .{err},
+            ),
+        };
 
-    if (comptime builtin.os.tag == .windows) {
-        // Interrupt the blocking read so the thread can see the quit message
-        if (windows.kernel32.CancelIoEx(exec.read_thread_fd, null) == 0) {
-            switch (windows.kernel32.GetLastError()) {
-                .NOT_FOUND => {},
-                else => |err| log.warn("error interrupting read thread err={}", .{err}),
+        if (comptime builtin.os.tag == .windows) {
+            // Interrupt the blocking read so the thread can see the quit message
+            if (windows.kernel32.CancelIoEx(exec.read_thread_fd, null) == 0) {
+                switch (windows.kernel32.GetLastError()) {
+                    .NOT_FOUND => {},
+                    else => |err| log.warn("error interrupting read thread err={}", .{err}),
+                }
             }
         }
-    }
 
-    exec.read_thread.join();
+        exec.read_thread.join();
+    }
 }
 
 pub fn focusGained(
@@ -343,18 +361,17 @@ fn termiosTimer(
     assert(td.backend == .exec);
     const exec = &td.backend.exec;
 
-    // This is kind of hacky but we rebuild a Pty struct to get the
-    // termios data.
-    const mode: ptypkg.Mode = (Pty{
-        .master = exec.read_thread_fd,
-        .slave = undefined,
-    }).getMode() catch |err| err: {
-        log.warn("error getting termios mode err={}", .{err});
-
-        // If we have an error we return the default mode values
-        // which are the likely values.
-        break :err .{};
-    };
+    // On iOS, read_thread_fd is null so we can't get termios mode.
+    const mode: ptypkg.Mode = if (comptime builtin.os.tag == .ios)
+        .{}
+    else
+        (Pty{
+            .master = exec.read_thread_fd,
+            .slave = undefined,
+        }).getMode() catch |err| err: {
+            log.warn("error getting termios mode err={}", .{err});
+            break :err .{};
+        };
 
     // If the mode changed, then we process it.
     if (!std.meta.eql(mode, exec.termios_mode)) mode_change: {
@@ -522,10 +539,10 @@ pub const ThreadData = struct {
     // we aren't compiling with Flatpak support this is zero-sized.
     flatpak_wait_c: FlatpakHostCommand.Completion = .{},
 
-    /// Reader thread state
-    read_thread: std.Thread,
-    read_thread_pipe: posix.fd_t,
-    read_thread_fd: posix.fd_t,
+    /// Reader thread state (null on iOS where data is fed externally)
+    read_thread: if (builtin.os.tag == .ios) ?std.Thread else std.Thread,
+    read_thread_pipe: if (builtin.os.tag == .ios) ?posix.fd_t else posix.fd_t,
+    read_thread_fd: if (builtin.os.tag == .ios) ?posix.fd_t else posix.fd_t,
 
     /// The timer to detect termios state changes.
     termios_timer: xev.Timer,
@@ -537,7 +554,11 @@ pub const ThreadData = struct {
     termios_mode: ptypkg.Mode = .{},
 
     pub fn deinit(self: *ThreadData, alloc: Allocator) void {
-        posix.close(self.read_thread_pipe);
+        if (comptime builtin.os.tag == .ios) {
+            if (self.read_thread_pipe) |pipe| posix.close(pipe);
+        } else {
+            posix.close(self.read_thread_pipe);
+        }
 
         // Clear our write pools. We know we aren't ever going to do
         // any more IO since we stop our data stream below so we can just
@@ -928,6 +949,15 @@ const Subprocess = struct {
         };
 
         log.debug("starting command command={f}", .{ArgsFormatter{ .args = self.args }});
+
+        // On iOS, no command is executed due to sandbox restrictions.
+        // Data is fed from external sources (e.g., SSH) via the C API.
+        if (comptime builtin.os.tag == .ios) {
+            return .{
+                .read = pty.master,
+                .write = pty.master,
+            };
+        }
 
         // If we can't access the cwd, then don't set any cwd and inherit.
         // This is important because our cwd can be set by the shell (OSC 7)

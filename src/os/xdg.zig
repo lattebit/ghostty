@@ -5,6 +5,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const posix = std.posix;
+const objc = @import("objc");
 const homedir = @import("homedir.zig");
 const env_os = @import("env.zig");
 
@@ -58,6 +59,11 @@ fn dir(
     opts: Options,
     internal_opts: InternalOptions,
 ) ![]u8 {
+    // iOS uses NSHomeDirectory to resolve sandbox directories
+    if (comptime builtin.os.tag == .ios) {
+        return try iosDir(alloc, opts.subdir, internal_opts);
+    }
+
     // If we have a cached home dir, use that.
     if (opts.home) |home| {
         return try std.fs.path.join(alloc, &[_][]const u8{
@@ -100,6 +106,31 @@ fn dir(
 
     return error.NoHomeDir;
 }
+
+/// iOS-specific directory resolution using NSHomeDirectory.
+/// Maps XDG directories to iOS sandbox standard locations:
+///   .cache → Library/Caches
+///   .config/.local/state → Library/Application Support
+fn iosDir(alloc: Allocator, subdir: ?[]const u8, internal_opts: InternalOptions) ![]u8 {
+    const home_ptr = foundation.NSHomeDirectory();
+    const home_str = objc.Object{ .value = @intFromPtr(home_ptr orelse return error.NoHomeDir) };
+    const c_str = home_str.getProperty([*:0]const u8, "UTF8String");
+    const home_path = std.mem.sliceTo(c_str, 0);
+
+    const lib_subdir = if (std.mem.eql(u8, internal_opts.default_subdir, ".cache"))
+        "Library/Caches"
+    else
+        "Library/Application Support";
+
+    if (subdir) |sub| {
+        return try std.fs.path.join(alloc, &[_][]const u8{ home_path, lib_subdir, "ghostty", sub });
+    }
+    return try std.fs.path.join(alloc, &[_][]const u8{ home_path, lib_subdir, "ghostty" });
+}
+
+const foundation = struct {
+    extern "c" fn NSHomeDirectory() ?*anyopaque;
+};
 
 /// Parses the xdg-terminal-exec specification. This expects argv[0] to
 /// be "xdg-terminal-exec".

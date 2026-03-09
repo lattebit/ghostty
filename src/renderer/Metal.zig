@@ -129,6 +129,12 @@ pub fn init(alloc: Allocator, opts: rendererpkg.Options) !Metal {
         .ios => {
             const view_layer = objc.Object.fromId(info.view.getProperty(?*anyopaque, "layer"));
             view_layer.msgSend(void, objc.sel("addSublayer:"), .{layer.layer.value});
+
+            // The sublayer doesn't inherit bounds automatically, so set
+            // its initial frame to match the parent. The host UIView's
+            // layoutSubviews must keep sublayer frames in sync on resize.
+            const parent_bounds = view_layer.getProperty(graphics.Rect, "bounds");
+            layer.layer.setProperty("frame", parent_bounds);
         },
 
         else => @compileError("unsupported target for Metal"),

@@ -1837,6 +1837,25 @@ pub const CAPI = struct {
         surface.preeditCallback(if (len == 0) null else ptr[0..len]);
     }
 
+    /// Write data to the terminal as if it came from the PTY.
+    /// This is the primary way to feed external data (e.g., SSH output)
+    /// to the terminal on iOS where no local process is spawned.
+    export fn ghostty_surface_write_pty_output(
+        surface: *Surface,
+        ptr: [*]const u8,
+        len: usize,
+    ) void {
+        surface.core_surface.io.processOutput(ptr[0..len]);
+    }
+
+    /// Returns true if the terminal is currently on the alternate screen.
+    /// The alternate screen is used by fullscreen apps like vim, less, htop.
+    export fn ghostty_surface_is_alternate_screen(surface: *Surface) bool {
+        surface.core_surface.renderer_state.mutex.lock();
+        defer surface.core_surface.renderer_state.mutex.unlock();
+        return surface.core_surface.renderer_state.terminal.screens.active_key == .alternate;
+    }
+
     /// Returns true if the surface currently has mouse capturing
     /// enabled.
     export fn ghostty_surface_mouse_captured(surface: *Surface) bool {
