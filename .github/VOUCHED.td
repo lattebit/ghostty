@@ -52,8 +52,10 @@ d-dudas
 daiimus
 damyanbogoev
 danulqua
+dariogriffo
 dervedro
 diaaeddin
+dmehala
 doprz
 douglance
 douglas
@@ -78,6 +80,7 @@ jacobsandlund
 jake-stewart
 jcollie
 jguthmiller
+jmcgover
 johnslavik
 josephmart
 jparise
@@ -110,6 +113,7 @@ misairuzame
 mischief
 mitchellh
 miupa
+molechowski
 mrmage
 mtak
 natesmyth
@@ -121,6 +125,7 @@ nwehg
 oshdubh
 pan93412
 pangoraw
+pauley-unsaturated
 peilingjiang
 peterdavehello
 phush0
