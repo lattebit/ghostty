@@ -120,10 +120,18 @@ pub const GlobalState = struct {
         initSignals();
 
         // Setup our Xev backend if we're dynamic
-        if (comptime xev.dynamic) xev.detect() catch |err| {
-            std.log.warn("failed to detect xev backend, falling back to " ++
-                "most compatible backend err={}", .{err});
-        };
+        if (comptime xev.dynamic) {
+            if (comptime builtin.target.abi.isAndroid()) {
+                // Android seccomp blocks io_uring syscalls with SIGSYS,
+                // so force epoll without probing.
+                _ = xev.prefer(.epoll);
+            } else {
+                xev.detect() catch |err| {
+                    std.log.warn("failed to detect xev backend, falling back to " ++
+                        "most compatible backend err={}", .{err});
+                };
+            }
+        }
 
         // Output some debug information right away
         std.log.info("ghostty version={s}", .{build_config.version_string});

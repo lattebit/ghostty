@@ -477,9 +477,9 @@ pub fn add(
         .freetype = true,
         .@"backend-metal" = target.result.os.tag.isDarwin(),
         .@"backend-osx" = target.result.os.tag == .macos,
-        // OpenGL3 backend should only be built on non-Apple targets.
-        // Apple platforms use Metal (and macOS may also use the OSX backend).
-        .@"backend-opengl3" = !target.result.os.tag.isDarwin(),
+        // OpenGL3 backend should only be built on desktop non-Apple targets.
+        // Apple platforms use Metal, Android uses GLES (no desktop GL loader).
+        .@"backend-opengl3" = !target.result.os.tag.isDarwin() and !target.result.abi.isAndroid(),
     })) |dep| {
         step.root_module.addImport("dcimgui", dep.module("dcimgui"));
         step.linkLibrary(dep.artifact("dcimgui"));
@@ -530,12 +530,14 @@ pub fn add(
 
     // If we're building an exe then we have additional dependencies.
     if (step.kind != .lib) {
-        // We always statically compile glad
-        step.addIncludePath(b.path("vendor/glad/include/"));
-        step.addCSourceFile(.{
-            .file = b.path("vendor/glad/src/gl.c"),
-            .flags = &.{},
-        });
+        // GLAD is only needed for desktop OpenGL, not ES.
+        if (!step.rootModuleTarget().abi.isAndroid()) {
+            step.addIncludePath(b.path("vendor/glad/include/"));
+            step.addCSourceFile(.{
+                .file = b.path("vendor/glad/src/gl.c"),
+                .flags = &.{},
+            });
+        }
 
         // When we're targeting flatpak we ALWAYS link GTK so we
         // get access to glib for dbus.

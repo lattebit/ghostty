@@ -12,6 +12,7 @@ pub const Runtime = enum {
     gtk,
 
     pub fn default(target: std.Target) Runtime {
+        if (target.abi.isAndroid()) return .none;
         return switch (target.os.tag) {
             // The Linux and FreeBSD default is GTK because it is a full
             // featured application.

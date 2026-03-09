@@ -31,8 +31,16 @@ pub fn destroy(v: Texture) void {
     glad.context.DeleteTextures.?(1, &v.id);
 }
 
+const is_gles = @import("c.zig").is_gles;
+
 /// Enum for possible texture binding targets.
-pub const Target = enum(c_uint) {
+pub const Target = if (is_gles) enum(c_uint) {
+    @"2D" = c.GL_TEXTURE_2D,
+    @"3D" = c.GL_TEXTURE_3D,
+    @"2DArray" = c.GL_TEXTURE_2D_ARRAY,
+    CubeMap = c.GL_TEXTURE_CUBE_MAP,
+    @"2DMultisample" = c.GL_TEXTURE_2D_MULTISAMPLE,
+} else enum(c_uint) {
     @"1D" = c.GL_TEXTURE_1D,
     @"2D" = c.GL_TEXTURE_2D,
     @"3D" = c.GL_TEXTURE_3D,
@@ -50,7 +58,6 @@ pub const Parameter = enum(c_uint) {
     BaseLevel = c.GL_TEXTURE_BASE_LEVEL,
     CompareFunc = c.GL_TEXTURE_COMPARE_FUNC,
     CompareMode = c.GL_TEXTURE_COMPARE_MODE,
-    LodBias = c.GL_TEXTURE_LOD_BIAS,
     MinFilter = c.GL_TEXTURE_MIN_FILTER,
     MagFilter = c.GL_TEXTURE_MAG_FILTER,
     MinLod = c.GL_TEXTURE_MIN_LOD,
@@ -66,7 +73,16 @@ pub const Parameter = enum(c_uint) {
 };
 
 /// Internal format enum for texture images.
-pub const InternalFormat = enum(c_int) {
+pub const InternalFormat = if (is_gles) enum(c_int) {
+    red = c.GL_RED,
+    rgb = c.GL_RGB8,
+    rgba = c.GL_RGBA8,
+
+    srgb = c.GL_SRGB8,
+    srgba = c.GL_SRGB8_ALPHA8,
+
+    _,
+} else enum(c_int) {
     red = c.GL_RED,
     rgb = c.GL_RGB8,
     rgba = c.GL_RGBA8,
@@ -77,18 +93,21 @@ pub const InternalFormat = enum(c_int) {
     rgba_compressed = c.GL_COMPRESSED_RGBA_BPTC_UNORM,
     srgba_compressed = c.GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM,
 
-    // There are so many more that I haven't filled in.
     _,
 };
 
 /// Format for texture images
-pub const Format = enum(c_uint) {
+pub const Format = if (is_gles) enum(c_uint) {
+    red = c.GL_RED,
+    rgb = c.GL_RGB,
+    rgba = c.GL_RGBA,
+    // GL_BGRA is not available in ES core; use GL_RGBA and CPU-swizzle.
+    _,
+} else enum(c_uint) {
     red = c.GL_RED,
     rgb = c.GL_RGB,
     rgba = c.GL_RGBA,
     bgra = c.GL_BGRA,
-
-    // There are so many more that I haven't filled in.
     _,
 };
 

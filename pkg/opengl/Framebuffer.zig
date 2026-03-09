@@ -46,7 +46,17 @@ pub const Attachment = enum(c_uint) {
     _,
 };
 
-pub const Status = enum(c_uint) {
+const is_gles = @import("c.zig").is_gles;
+
+pub const Status = if (is_gles) enum(c_uint) {
+    complete = c.GL_FRAMEBUFFER_COMPLETE,
+    undefined = c.GL_FRAMEBUFFER_UNDEFINED,
+    incomplete_attachment = c.GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT,
+    incomplete_missing_attachment = c.GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT,
+    unsupported = c.GL_FRAMEBUFFER_UNSUPPORTED,
+    incomplete_multisample = c.GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE,
+    _,
+} else enum(c_uint) {
     complete = c.GL_FRAMEBUFFER_COMPLETE,
     undefined = c.GL_FRAMEBUFFER_UNDEFINED,
     incomplete_attachment = c.GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT,

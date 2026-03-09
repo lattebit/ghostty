@@ -18,6 +18,9 @@ pub const bold = @embedFile("jetbrains_mono_bold");
 pub const italic = @embedFile("jetbrains_mono_italic");
 pub const bold_italic = @embedFile("jetbrains_mono_bold_italic");
 
+/// CJK fallback font (Simplified Chinese, covers CJK/Hiragana/Katakana/Hangul)
+pub const noto_sans_cjk_sc = @embedFile("res/NotoSansCJKsc-Regular.otf");
+
 /// Emoji fonts
 pub const emoji = @embedFile("res/NotoColorEmoji.ttf");
 pub const emoji_text = @embedFile("res/NotoEmoji-Regular.ttf");

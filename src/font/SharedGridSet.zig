@@ -332,6 +332,23 @@ fn collection(
         },
     );
 
+    // CJK fallback font for platforms without font discovery.
+    if (comptime Discover == void) {
+        _ = try c.add(
+            self.alloc,
+            try .init(
+                self.font_lib,
+                font.embedded.noto_sans_cjk_sc,
+                load_options.faceOptions(),
+            ),
+            .{
+                .style = .regular,
+                .fallback = true,
+                .size_adjustment = font.default_fallback_adjustment,
+            },
+        );
+    }
+
     // On macOS, always search for and add the Apple Emoji font
     // as our preferred emoji font for fallback. We do this in case
     // people add other emoji fonts to their system, we always want to

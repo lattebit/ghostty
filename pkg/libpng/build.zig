@@ -13,12 +13,16 @@ pub fn build(b: *std.Build) !void {
         .linkage = .static,
     });
     lib.linkLibC();
-    if (target.result.os.tag == .linux) {
+    if (target.result.os.tag == .linux and !target.result.abi.isAndroid()) {
         lib.linkSystemLibrary("m");
     }
     if (target.result.os.tag.isDarwin()) {
         const apple_sdk = @import("apple_sdk");
         try apple_sdk.addPaths(b, lib);
+    }
+    if (target.result.abi.isAndroid()) {
+        const android_ndk = @import("android_ndk");
+        try android_ndk.addPaths(b, lib);
     }
 
     // For dynamic linking, we prefer dynamic linking and to search by

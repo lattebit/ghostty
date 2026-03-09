@@ -340,6 +340,11 @@ pub const Action = union(Key) {
     /// otherwise the terminal-set title.
     copy_title_to_clipboard,
 
+    /// Forward keyboard input from a manual termio backend to the host
+    /// application. This is used when the terminal has no local PTY and the
+    /// host is responsible for sending input to the remote endpoint.
+    forward_write: ForwardWrite,
+
     /// Sync with: ghostty_action_tag_e
     pub const Key = enum(c_int) {
         quit,
@@ -406,6 +411,7 @@ pub const Action = union(Key) {
         search_selected,
         readonly,
         copy_title_to_clipboard,
+        forward_write,
 
         test "ghostty.h Action.Key" {
             try lib.checkGhosttyHEnum(Key, "GHOSTTY_ACTION_");
@@ -994,6 +1000,23 @@ pub const SearchSelected = struct {
     pub fn cval(self: SearchSelected) C {
         return .{
             .selected = if (self.selected) |s| @intCast(s) else -1,
+        };
+    }
+};
+
+pub const ForwardWrite = struct {
+    data: []const u8,
+
+    // Sync with: ghostty_action_forward_write_s
+    pub const C = extern struct {
+        data: [*]const u8,
+        len: usize,
+    };
+
+    pub fn cval(self: ForwardWrite) C {
+        return .{
+            .data = self.data.ptr,
+            .len = self.data.len,
         };
     }
 };

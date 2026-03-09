@@ -15,6 +15,9 @@ const App = @import("App.zig");
 const Ghostty = @import("main_c.zig").Ghostty;
 const state = &@import("global.zig").state;
 
+// Android logcat function, linked from liblog.
+extern "log" fn __android_log_write(prio: c_int, tag: [*:0]const u8, text: [*]const u8) c_int;
+
 /// The return type for main() depends on the build artifact. The lib build
 /// also calls "main" in order to run the CLI actions, but it calls it as
 /// an API and not an entrypoint.
@@ -142,6 +145,23 @@ fn logFn(
         const logger = macos.os.Log.create(build_config.bundle_id, @tagName(scope));
         defer logger.release();
         logger.log(std.heap.c_allocator, mac_level, prefix ++ format, args);
+    }
+
+    // On Android, send logs to logcat via __android_log_write.
+    android: {
+        if (comptime !builtin.target.abi.isAndroid()) break :android;
+        if (comptime builtin.mode != .Debug and level == .debug) break :android;
+
+        const android_level: c_int = switch (level) {
+            .debug => 3, // ANDROID_LOG_DEBUG
+            .info => 4, // ANDROID_LOG_INFO
+            .warn => 5, // ANDROID_LOG_WARN
+            .err => 6, // ANDROID_LOG_ERROR
+        };
+        const tag = comptime if (scope == .default) "ghostty" else "ghostty." ++ @tagName(scope);
+        var log_buf: [1024]u8 = undefined;
+        const msg = std.fmt.bufPrint(&log_buf, format ++ "\x00", args) catch break :android;
+        _ = __android_log_write(android_level, tag, msg.ptr);
     }
 
     stderr: {

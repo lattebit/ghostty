@@ -34,6 +34,10 @@ pub fn initStatic(
     });
     lib.linkLibC();
 
+    if (lib.rootModuleTarget().abi.isAndroid()) {
+        try @import("android_ndk").addPaths(b, lib);
+    }
+
     // These must be bundled since we're compiling into a static lib.
     // Otherwise, you get undefined symbol errors.
     lib.bundle_compiler_rt = true;
@@ -87,6 +91,14 @@ pub fn initShared(
         .use_llvm = true,
     });
     _ = try deps.add(lib);
+
+    // Android NDK support
+    if (lib.rootModuleTarget().abi.isAndroid()) {
+        lib.link_z_max_page_size = 16384; // 16kb for Android 15+
+        try @import("android_ndk").addPaths(b, lib);
+        lib.linkSystemLibrary("GLESv3");
+        lib.linkSystemLibrary("EGL");
+    }
 
     // Get our debug symbols
     const dsymutil: ?std.Build.LazyPath = dsymutil: {

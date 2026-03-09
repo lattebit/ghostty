@@ -83,12 +83,17 @@ pub const Binding = struct {
         try errors.getError();
     }
 
+    /// glVertexAttribLFormat with GL_DOUBLE. Not available in OpenGL ES.
     pub fn attributeLFormat(
         _: Binding,
         idx: c.GLuint,
         size: c.GLint,
         offset: c.GLuint,
     ) !void {
+        if (@import("c.zig").is_gles) {
+            _ = .{ idx, size, offset };
+            @compileError("GL_DOUBLE / glVertexAttribLFormat not available in OpenGL ES");
+        }
         glad.context.VertexAttribLFormat.?(
             idx,
             size,

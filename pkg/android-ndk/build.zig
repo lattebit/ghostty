@@ -27,6 +27,7 @@ pub fn addPaths(b: *std.Build, step: *std.Build.Step.Compile) !void {
             libc: std.Build.LazyPath,
             cpp_include: std.Build.LazyPath,
             lib: std.Build.LazyPath,
+            api_lib: std.Build.LazyPath,
         }) = .empty;
     };
 
@@ -106,6 +107,7 @@ pub fn addPaths(b: *std.Build, step: *std.Build.Step.Compile) !void {
             .libc = libc_path,
             .cpp_include = .{ .cwd_relative = cpp_include },
             .lib = .{ .cwd_relative = lib },
+            .api_lib = .{ .cwd_relative = c_runtime_dir },
         };
     }
 
@@ -114,6 +116,7 @@ pub fn addPaths(b: *std.Build, step: *std.Build.Step.Compile) !void {
     step.setLibCFile(value.libc);
     step.root_module.addSystemIncludePath(value.cpp_include);
     step.root_module.addLibraryPath(value.lib);
+    step.root_module.addLibraryPath(value.api_lib);
 }
 
 fn findNDKPath(b: *std.Build) ?[]const u8 {

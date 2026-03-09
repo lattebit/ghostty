@@ -25,7 +25,13 @@ const log = std.log.scoped(.embedded_window);
 
 pub const resourcesDir = internal_os.resourcesDir;
 
+const build_config = @import("../build_config.zig");
+
 pub const App = struct {
+    // On GLES (Android), the renderer thread has no EGL context, so GL
+    // draw calls must be issued from the host's GL thread instead.
+    pub const must_draw_from_app_thread = build_config.renderer == .opengl_es;
+
     /// Because we only expect the embedding API to be used in embedded
     /// environments, the options are extern so that we can expose it
     /// directly to a C callconv and not pay for any translation costs.
@@ -342,6 +348,7 @@ pub const App = struct {
 pub const Platform = union(PlatformTag) {
     macos: MacOS,
     ios: IOS,
+    android: Android,
 
     // If our build target for libghostty is not darwin then we do
     // not include macos support at all.
@@ -355,6 +362,11 @@ pub const Platform = union(PlatformTag) {
         uiview: objc.Object,
     } else void;
 
+    pub const Android = struct {
+        /// The ANativeWindow pointer for EGL surface creation.
+        native_window: ?*anyopaque,
+    };
+
     // The C ABI compatible version of this union. The tag is expected
     // to be stored elsewhere.
     pub const C = extern union {
@@ -364,6 +376,10 @@ pub const Platform = union(PlatformTag) {
 
         ios: extern struct {
             uiview: ?*anyopaque,
+        },
+
+        android: extern struct {
+            native_window: ?*anyopaque,
         },
     };
 
@@ -384,6 +400,10 @@ pub const Platform = union(PlatformTag) {
                     break :ios error.UIViewMustBeSet);
                 break :ios .{ .ios = .{ .uiview = uiview } };
             } else error.UnsupportedPlatform,
+
+            .android => .{ .android = .{
+                .native_window = c_platform.android.native_window,
+            } },
         };
     }
 };
@@ -394,6 +414,7 @@ pub const PlatformTag = enum(c_int) {
 
     macos = 1,
     ios = 2,
+    android = 3,
 };
 
 pub const EnvVar = extern struct {
@@ -1677,6 +1698,19 @@ pub const CAPI = struct {
     /// call as soon as possible (NOW if possible).
     export fn ghostty_surface_draw(surface: *Surface) void {
         surface.draw();
+    }
+
+    /// Feed raw VT byte stream data into the terminal for rendering.
+    /// This is used with the manual termio backend where data comes
+    /// from an external source (e.g., SSH, serial port) rather than
+    /// a local PTY subprocess.
+    export fn ghostty_surface_feed_data(
+        surface: *Surface,
+        data: [*]const u8,
+        len: usize,
+    ) void {
+        if (len == 0) return;
+        surface.core_surface.io.processOutput(data[0..len]);
     }
 
     /// Update the size of a surface. This will trigger resize notifications

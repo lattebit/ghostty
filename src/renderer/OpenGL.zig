@@ -31,11 +31,14 @@ pub const custom_shader_y_is_down = false;
 /// sync, we have no need for multi-buffering.
 pub const swap_chain_count = 1;
 
+const build_config = @import("../build_config.zig");
+const is_gles = build_config.renderer == .opengl_es;
+
 const log = std.log.scoped(.opengl);
 
-/// We require at least OpenGL 4.3
-pub const MIN_VERSION_MAJOR = 4;
-pub const MIN_VERSION_MINOR = 3;
+/// Minimum required GL version: 4.3 for desktop, 3.2 for ES.
+pub const MIN_VERSION_MAJOR = if (is_gles) 3 else 4;
+pub const MIN_VERSION_MINOR = if (is_gles) 2 else 3;
 
 alloc: std.mem.Allocator,
 
@@ -148,14 +151,22 @@ fn prepareContext(getProcAddress: anytype) !void {
         return error.OpenGLOutdated;
     }
 
-    // Enable debug output for the context.
-    try gl.enable(gl.c.GL_DEBUG_OUTPUT);
-
-    // Register our debug message callback with the OpenGL context.
-    gl.glad.context.DebugMessageCallback.?(glDebugMessageCallback, null);
+    // GL debug output setup.
+    // GLES drivers often lack GL_DEBUG_OUTPUT / DebugMessageCallback
+    // support (e.g. Android emulator), so skip entirely on ES.
+    if (!is_gles) {
+        try gl.enable(gl.c.GL_DEBUG_OUTPUT);
+        if (gl.glad.context.DebugMessageCallback) |cb| {
+            cb(glDebugMessageCallback, null);
+        }
+    }
 
     // Enable SRGB framebuffer for linear blending support.
-    try gl.enable(gl.c.GL_FRAMEBUFFER_SRGB);
+    // GL_FRAMEBUFFER_SRGB is not available in OpenGL ES; sRGB handling
+    // is done entirely in shaders on ES.
+    if (!is_gles) {
+        try gl.enable(gl.c.GL_FRAMEBUFFER_SRGB);
+    }
 }
 
 /// This is called early right after surface creation.
@@ -170,9 +181,9 @@ pub fn surfaceInit(surface: *apprt.Surface) !void {
         => try prepareContext(null),
 
         apprt.embedded => {
-            // TODO(mitchellh): this does nothing today to allow libghostty
-            // to compile for OpenGL targets but libghostty is strictly
-            // broken for rendering on this platforms.
+            // On embedded/Android targets, the EGL context is set up by
+            // the host. We just initialize our GL state.
+            if (is_gles) try prepareContext(null);
         },
     }
 
@@ -299,13 +310,15 @@ pub fn initTarget(self: *const OpenGL, width: usize, height: usize) !Target {
 pub fn present(self: *OpenGL, target: Target) !void {
     // In order to present a target we blit it to the default framebuffer.
 
-    // We disable GL_FRAMEBUFFER_SRGB while doing this blit, otherwise the
-    // values may be linearized as they're copied, but even though the draw
-    // framebuffer has a linear internal format, the values in it should be
-    // sRGB, not linear!
-    try gl.disable(gl.c.GL_FRAMEBUFFER_SRGB);
-    defer gl.enable(gl.c.GL_FRAMEBUFFER_SRGB) catch |err| {
-        log.err("Error re-enabling GL_FRAMEBUFFER_SRGB, err={}", .{err});
+    // On desktop, disable GL_FRAMEBUFFER_SRGB during blit to prevent
+    // double-linearization. Not needed on ES (no GL_FRAMEBUFFER_SRGB).
+    if (!is_gles) {
+        try gl.disable(gl.c.GL_FRAMEBUFFER_SRGB);
+    }
+    defer if (!is_gles) {
+        gl.enable(gl.c.GL_FRAMEBUFFER_SRGB) catch |err| {
+            log.err("Error re-enabling GL_FRAMEBUFFER_SRGB, err={}", .{err});
+        };
     };
 
     // Bind the target for reading.
@@ -389,7 +402,8 @@ pub const ImageTextureFormat = enum {
         return switch (self) {
             .gray => .red,
             .rgba => .rgba,
-            .bgra => .bgra,
+            // GL_BGRA is not available in ES core; use GL_RGBA.
+            .bgra => if (is_gles) .rgba else .bgra,
         };
     }
 };
@@ -424,6 +438,34 @@ pub fn initAtlasTexture(
     atlas: *const font.Atlas,
 ) Texture.Error!Texture {
     _ = self;
+
+    if (is_gles) {
+        // ES uses 2D textures with normalized coordinates (no Rectangle target).
+        // GL_BGRA is not available in ES core; use GL_RGBA (atlas data is
+        // converted to RGBA at a higher level on Android via FreeType).
+        const format: gl.Texture.Format, const internal_format: gl.Texture.InternalFormat =
+            switch (atlas.format) {
+                .grayscale => .{ .red, .red },
+                .bgra => .{ .rgba, .srgba },
+                else => @panic("unsupported atlas format for OpenGL ES texture"),
+            };
+
+        return try Texture.init(
+            .{
+                .format = format,
+                .internal_format = internal_format,
+                .target = .@"2D",
+                .min_filter = .nearest,
+                .mag_filter = .nearest,
+                .wrap_s = .clamp_to_edge,
+                .wrap_t = .clamp_to_edge,
+            },
+            atlas.size,
+            atlas.size,
+            null,
+        );
+    }
+
     const format: gl.Texture.Format, const internal_format: gl.Texture.InternalFormat =
         switch (atlas.format) {
             .grayscale => .{ .red, .red },

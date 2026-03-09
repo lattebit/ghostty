@@ -111,8 +111,8 @@ pub const LoadingImage = struct {
         t: command.Transmission,
         path: []const u8,
     ) !void {
-        // windows is currently unsupported, does it support shm?
-        if (comptime builtin.target.os.tag == .windows) {
+        // shm_open is not available on Windows or Android.
+        if (comptime builtin.target.os.tag == .windows or builtin.target.abi.isAndroid()) {
             return error.UnsupportedMedium;
         }
 
