@@ -620,15 +620,15 @@ pub fn init(
     // This separate block ({}) is important because our errdefers must
     // be scoped here to be valid.
     {
-        const is_android = comptime builtin.target.abi.isAndroid();
+        const use_manual_backend = comptime (builtin.target.abi.isAndroid() or builtin.os.tag == .ios);
 
         // Initialize our IO mailbox
         var io_mailbox = try termio.Mailbox.initSPSC(alloc);
         errdefer io_mailbox.deinit(alloc);
 
-        // Select the backend based on the target platform. Android uses
-        // the manual backend (no local PTY); all other platforms use exec.
-        const backend: termio.Backend = if (is_android) .{ .manual = .{} } else backend: {
+        // Select the backend based on the target platform. Android and iOS
+        // use the manual backend (no local PTY); other platforms use exec.
+        const backend: termio.Backend = if (use_manual_backend) .{ .manual = .{} } else backend: {
             var env = rt_surface.defaultTermioEnv() catch |err| env: {
                 log.warn("error getting env map for surface err={}", .{err});
                 break :env internal_os.getEnvMap(alloc) catch
