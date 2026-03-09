@@ -58,7 +58,6 @@ pub const Parameter = enum(c_uint) {
     BaseLevel = c.GL_TEXTURE_BASE_LEVEL,
     CompareFunc = c.GL_TEXTURE_COMPARE_FUNC,
     CompareMode = c.GL_TEXTURE_COMPARE_MODE,
-    LodBias = c.GL_TEXTURE_LOD_BIAS,
     MinFilter = c.GL_TEXTURE_MIN_FILTER,
     MagFilter = c.GL_TEXTURE_MAG_FILTER,
     MinLod = c.GL_TEXTURE_MIN_LOD,

@@ -34,6 +34,10 @@ pub fn initStatic(
     });
     lib.linkLibC();
 
+    if (lib.rootModuleTarget().abi.isAndroid()) {
+        try @import("android_ndk").addPaths(b, lib);
+    }
+
     // These must be bundled since we're compiling into a static lib.
     // Otherwise, you get undefined symbol errors.
     lib.bundle_compiler_rt = true;

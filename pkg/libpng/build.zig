@@ -13,7 +13,7 @@ pub fn build(b: *std.Build) !void {
         .linkage = .static,
     });
     lib.linkLibC();
-    if (target.result.os.tag == .linux) {
+    if (target.result.os.tag == .linux and !target.result.abi.isAndroid()) {
         lib.linkSystemLibrary("m");
     }
     if (target.result.os.tag.isDarwin()) {
