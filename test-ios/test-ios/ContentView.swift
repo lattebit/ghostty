@@ -9,12 +9,8 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let app = ghostty.app {
-                GhosttyTerminalView(app: app)
+                GhosttyTerminalView(app: app, uiView: $terminalView)
                     .ignoresSafeArea(.keyboard)
-                    .overlay(alignment: .topLeading) {
-                        // Capture the UIView reference for demo injection
-                        GhosttyViewFinder(view: $terminalView)
-                    }
             } else {
                 Text("Ghostty failed to initialize")
                     .foregroundColor(.red)
@@ -59,28 +55,4 @@ struct ContentView: View {
             }
         }
     }
-}
-
-/// A helper view to find the GhosttyUIView reference from the SwiftUI hierarchy.
-struct GhosttyViewFinder: UIViewRepresentable {
-    @Binding var view: GhosttyUIView?
-
-    func makeUIView(context: Context) -> UIView {
-        let probe = UIView(frame: .zero)
-        probe.isHidden = true
-        DispatchQueue.main.async {
-            // Walk up from the probe to find GhosttyUIView
-            var current = probe.superview
-            while let v = current {
-                if let ghosttyView = v as? GhosttyUIView {
-                    self.view = ghosttyView
-                    return
-                }
-                current = v.superview
-            }
-        }
-        return probe
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {}
 }

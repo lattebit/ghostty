@@ -8,9 +8,11 @@ import GhosttyKit
 /// and ghostty_surface_draw() each frame.
 struct GhosttyTerminalView: UIViewRepresentable {
     let app: ghostty_app_t
+    @Binding var uiView: GhosttyUIView?
 
     func makeUIView(context: Context) -> GhosttyUIView {
         let view = GhosttyUIView(app: app)
+        DispatchQueue.main.async { self.uiView = view }
         return view
     }
 
@@ -40,12 +42,6 @@ class GhosttyUIView: UIView {
         }
     }
 
-    // MARK: - Layer
-
-    override class var layerClass: AnyClass {
-        CAMetalLayer.self
-    }
-
     // MARK: - Lifecycle
 
     override func didMoveToWindow() {
@@ -70,8 +66,11 @@ class GhosttyUIView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        guard let surface = surface else { return }
 
+        // Keep the IOSurfaceLayer sublayer sized to match the view.
+        layer.sublayers?.forEach { $0.frame = bounds }
+
+        guard let surface = surface else { return }
         let scale = contentScaleFactor
         ghostty_surface_set_content_scale(surface, scale, scale)
         ghostty_surface_set_size(
