@@ -151,12 +151,14 @@ fn prepareContext(getProcAddress: anytype) !void {
         return error.OpenGLOutdated;
     }
 
-    // Enable debug output for the context.
-    try gl.enable(gl.c.GL_DEBUG_OUTPUT);
-
-    // Register our debug message callback with the OpenGL context.
-    if (gl.glad.context.DebugMessageCallback) |cb| {
-        cb(glDebugMessageCallback, null);
+    // GL debug output setup.
+    // GLES drivers often lack GL_DEBUG_OUTPUT / DebugMessageCallback
+    // support (e.g. Android emulator), so skip entirely on ES.
+    if (!is_gles) {
+        try gl.enable(gl.c.GL_DEBUG_OUTPUT);
+        if (gl.glad.context.DebugMessageCallback) |cb| {
+            cb(glDebugMessageCallback, null);
+        }
     }
 
     // Enable SRGB framebuffer for linear blending support.

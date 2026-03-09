@@ -1,13 +1,9 @@
 #include "common.glsl"
 
 // In GLSL ES, sampler2DRect does not exist. We use sampler2D with normalized
-// texture coordinates instead (pixel coords are normalized in the shader).
+// texture coordinates instead (pixel coords are normalized via textureSize).
 layout(binding = 0) uniform sampler2D atlas_grayscale;
 layout(binding = 1) uniform sampler2D atlas_color;
-
-// Atlas texture sizes for normalizing pixel coordinates to [0,1].
-uniform vec2 atlas_grayscale_size;
-uniform vec2 atlas_color_size;
 
 in CellTextVertexOut {
     flat uint atlas;
@@ -22,8 +18,8 @@ const uint ATLAS_COLOR = 1u;
 layout(location = 0) out vec4 out_FragColor;
 
 void main() {
-    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0;
-    bool use_linear_correction = (bools & USE_LINEAR_CORRECTION) != 0;
+    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0u;
+    bool use_linear_correction = (bools & USE_LINEAR_CORRECTION) != 0u;
 
     if (in_data.atlas == ATLAS_GRAYSCALE) {
         vec4 color = in_data.color;
@@ -34,8 +30,8 @@ void main() {
             color.rgb *= vec3(color.a);
         }
 
-        // Normalize pixel coords for sampler2D.
-        vec2 norm_coord = in_data.tex_coord / atlas_grayscale_size;
+        // Normalize pixel coords for sampler2D using textureSize().
+        vec2 norm_coord = in_data.tex_coord / vec2(textureSize(atlas_grayscale, 0));
         float a = texture(atlas_grayscale, norm_coord).r;
 
         if (use_linear_correction) {
@@ -52,7 +48,7 @@ void main() {
         out_FragColor = color;
     } else {
         // ATLAS_COLOR
-        vec2 norm_coord = in_data.tex_coord / atlas_color_size;
+        vec2 norm_coord = in_data.tex_coord / vec2(textureSize(atlas_color, 0));
         vec4 color = texture(atlas_color, norm_coord);
 
         if (use_linear_blending) {

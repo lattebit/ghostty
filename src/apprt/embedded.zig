@@ -25,7 +25,13 @@ const log = std.log.scoped(.embedded_window);
 
 pub const resourcesDir = internal_os.resourcesDir;
 
+const build_config = @import("../build_config.zig");
+
 pub const App = struct {
+    // On GLES (Android), the renderer thread has no EGL context, so GL
+    // draw calls must be issued from the host's GL thread instead.
+    pub const must_draw_from_app_thread = build_config.renderer == .opengl_es;
+
     /// Because we only expect the embedding API to be used in embedded
     /// environments, the options are extern so that we can expose it
     /// directly to a C callconv and not pay for any translation costs.

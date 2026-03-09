@@ -29,8 +29,8 @@ layout(binding = 1, std430) readonly buffer bg_cells {
 void main() {
     uvec2 grid_size = unpack2u16(grid_size_packed_2u16);
     uvec2 cursor_pos = unpack2u16(cursor_pos_packed_2u16);
-    bool cursor_wide = (bools & CURSOR_WIDE) != 0;
-    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0;
+    bool cursor_wide = (bools & CURSOR_WIDE) != 0u;
+    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0u;
 
     vec2 cell_pos = cell_size * vec2(grid_pos);
 

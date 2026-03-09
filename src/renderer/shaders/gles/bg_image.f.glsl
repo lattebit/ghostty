@@ -11,7 +11,7 @@ flat in uint repeat;
 layout(location = 0) out vec4 out_FragColor;
 
 void main() {
-    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0;
+    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0u;
 
     // Flip Y: ES has lower-left origin, we need upper-left.
     vec2 frag_coord = vec2(gl_FragCoord.x, screen_size.y - gl_FragCoord.y);

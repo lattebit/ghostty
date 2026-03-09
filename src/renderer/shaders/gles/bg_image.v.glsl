@@ -31,7 +31,7 @@ flat out float opacity;
 flat out uint repeat;
 
 void main() {
-    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0;
+    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0u;
 
     vec4 position;
     position.x = (gl_VertexID == 2) ? 3.0 : -1.0;

@@ -11,7 +11,7 @@ layout(binding = 1, std430) readonly buffer bg_cells {
 
 vec4 cell_bg() {
     uvec2 grid_size = unpack2u16(grid_size_packed_2u16);
-    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0;
+    bool use_linear_blending = (bools & USE_LINEAR_BLENDING) != 0u;
 
     // Flip Y to get upper-left origin (ES has lower-left origin).
     vec2 frag_coord = vec2(gl_FragCoord.x, screen_size.y - gl_FragCoord.y);
